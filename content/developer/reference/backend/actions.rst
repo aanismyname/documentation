@@ -442,34 +442,93 @@ Actions triggered automatically on a predefined frequency.
     Priority of the action when executing multiple actions at the same time
 
 
-Advanced use: Batching
+Writing CRON functions
 ----------------------
 
-When executing a scheduled action, it's recommended to try batching progress in order
-to avoid hogging a worker for a long period of time and possibly running into timeout exceptions.
+When executing a scheduled action, it's recommended to try batching progress in
+order to avoid hogging a worker for a long period of time and possibly running
+into timeout exceptions. Therefore you should split the processing so that each
+call will progress on some of the work to be done.
 
-Odoo provides a simple API for scheduled action batching;
+When writing a such a function, you should focus on processing a single batch.
+A batch should process one or many records and should generally take no more
+than *a few seconds*.
 
 .. code-block:: python
 
-      self.env['ir.cron']._notify_progress(done=XX:int, remaining=XX:int)
+    def _cron_do_something(self, *, limit=300):  # limit: allows for tweaking
+        domain = [('state', '=', 'ready')]
+        records = self.search(domain, limit=limit)
+        records.do_something()
+        # notify progression
+        remaining = 0 if len(records) == limit else self.search_count(domain)
+        self.env['ir.cron']._commit_progress(len(records), remaining=remaining)
 
-This method allows the scheduler to know if progress was made and whether there is
-still remaining work that must be done.
+Work will be committed by the framework after each batch. The framework will
+call the function as many times as need to process remaining work.
 
-By default, if the API is used, the scheduler tries to process 10 batches in one sitting.
-If there are still remaining tasks after those 10 batches, a new cron call will be executed as
-soon as possible.
+When called from outside of the cron job, the progress function call will have
+no effect.
 
-Advanced use: Triggers
-----------------------
-
-For more complex use cases, Odoo provides a more advanced way to trigger
-scheduled actions directly from business code.
+There are some cases, where you may want to keep resources between multiple
+batches or want to loop yourself.
+If you do this, you must notify the scheduler of progress in your work by
+calling ``ir.cron._commit_progress`` and checking its result. The progress
+function returns the number of seconds remaining for your run; when 0, you must
+return as soon as possible.
+The following shows how to commit after each processed record while keeping an
+open connection.
 
 .. code-block:: python
 
-      action_record._trigger(at=XX:date)
+    def _cron_do_something(self):
+        # limit is less important as we already give back control to the scheduler
+        domain = [('state', '=', 'ready')]
+        records = self.search(domain)
+        self.env['ir.cron']._commit_progress(remaining=len(records))
+
+        with open_some_connection() as conn:
+            for record in records:
+                # Following is for this example, but you may have other needs.
+                # You should:
+                # - lock record (also checks existence)
+                # - prefetch: break prefetch in this case, we process one record
+                # - filtered_domain: record may have changed
+                try:
+                    record.lock_for_update()
+                    record = record.with_prefetch().filtered_domain(domain)
+                except LockError:
+                    record = None
+                if not record:
+                    continue
+                try
+                    record.do_something(conn)
+                    if not self.env['ir.cron']._commit_progress(1):
+                        break
+                except Exception:
+                    # if you handle exceptions, the default stategy is to
+                    # rollback first the error or reraise it
+                    self.env.cr.rollback()
+                    _logger.warning(...)
+
+Running CRON functions
+----------------------
+
+You should never call the CRON function directly.
+There are two ways to run functions: immediate (in current thread, but still in
+a separate transaction) or trigger to start at a given time or as soon as
+possible.
+
+.. code-block:: python
+
+    # run now (still in a separate transaction)
+    cron_record.method_direct_trigger()
+    # trigger
+    when: datetime | None = None  # for now
+    cron_record._trigger(when)
+
+Testing of a CRON function should be done in the registry test mode and calling
+``method_direct_trigger``.
 
 Security
 --------

@@ -221,7 +221,7 @@ Tracking and cancellation
 ==================
 Shipments registered with Envia can be tracked using the Tracking smart button from the delivery order or using the tracking link from the customer portal.
 
-.. image:: sendcloud_shipping/envia_customer_portal_tracking.png
+.. image:: envia_shipping/envia_customer_portal_tracking.png
    :align: center
    :alt: Customer portal tracking.
 

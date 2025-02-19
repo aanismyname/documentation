@@ -28,9 +28,11 @@ The following is a list of available shipping connectors in Odoo:
 
    * - Carrier
      - Region availability
+   * - :doc:`DHL Express <dhl_credentials>`
+     - All
    * - :doc:`FedEx <fedex>`
      - All
-   * - :doc:`DHL Express <dhl_credentials>`
+   * - :doc:`Envia.com <envia_shipping>`
      - All
    * - :doc:`UPS <ups_credentials>`
      - All

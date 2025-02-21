@@ -9,7 +9,7 @@ In Odoo, it is sometimes necessary to export or import data for running reports,
 modification. This document covers the export and import of data into and out of Odoo.
 
 .. important::
-   Sometimes, users run into a 'time out' error, or a record does not process, due to its size. This
+   Sometimes, user run into a 'time out' error, or a record does not process, due to its size. This
    can occur with large exports, or in cases where the import file is too large. To circumvent this
    limitation surrounding the size of the records, process exports or imports in smaller batches.
 
